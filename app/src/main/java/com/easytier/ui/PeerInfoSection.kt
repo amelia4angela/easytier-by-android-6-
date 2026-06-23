@@ -35,7 +35,8 @@ data class PeerInfoItem(
     val rxSpeed: String,
     val txSpeed: String,
     val natType: String = "",
-    val peerId: Int = 0
+    val peerId: Int = 0,
+    val isRelayed: Boolean = false
 )
 
 @Composable

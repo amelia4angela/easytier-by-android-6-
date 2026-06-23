@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
     private var connectionState by mutableStateOf(ConnectionButtonState())
     private var myNodeItem by mutableStateOf<PeerInfoItem?>(null)
     private var peerItems by mutableStateOf(listOf<PeerInfoItem>())
+    private var pollingActive = false
     // Log dialog state
     private var showLogDialogState by mutableStateOf(false)
     private var peerInfoExpanded by mutableStateOf(false)
@@ -1253,7 +1254,7 @@ class MainActivity : ComponentActivity() {
         override fun run() {
             if (isRunning) {
                 refreshPeerInfo()
-                mainHandler.postDelayed(this, 3000)
+                mainHandler.postDelayed(this, 1000L)
             }
         }
     }
@@ -1349,7 +1350,7 @@ class MainActivity : ComponentActivity() {
 
                             val hostname = peerIdToName[peerId] ?: route.optString("hostname", "?")
                             val version = route.optString("version", "?")
-                            val pathLatencyUs = route.optLong("path_latency", 0)
+                            val pathLatencyUs = route.optLong("path_latency", 0) * 1000L
 
                             val peerObj = peerMap[peerId]
                             var protocol = "?"
@@ -1394,24 +1395,50 @@ class MainActivity : ComponentActivity() {
 
                             val cost = route.optInt("cost", 0)
 
-                            // ── Determine P2P from actual peer connections ──
-                            // Route cost may be stale (not updated when P2P hole punch succeeds).
-                            // Check peer conns for direct tunnel types as a real-time indicator.
-                            val peerHasDirectP2P = peerObj?.let { p ->
-                                val pConns = p.optJSONArray("conns")
+                            // ── Detect P2P ──
+                            // Primary: directly_connected_conns (authoritative, set by PeerManager)
+                            val directlyConnected = peerObj?.optJSONArray("directly_connected_conns")
+                            var peerHasDirectP2P = directlyConnected != null && directlyConnected.length() > 0
+                            // Fallback: if peer has a UDP tunnel, it's definitely P2P (UDP-only for P2P)
+                            if (!peerHasDirectP2P && peerObj != null && cost > 0) {
+                                val pConns = peerObj.optJSONArray("conns")
                                 if (pConns != null) {
-                                    (0 until pConns.length()).any { ci ->
+                                    for (ci in 0 until pConns.length()) {
                                         val tunnel = pConns.getJSONObject(ci).optJSONObject("tunnel")
-                                        tunnel?.optString("tunnel_type", "") in
-                                            setOf("UdpHolePunch", "TcpHolePunch")
+                                        if (tunnel?.optString("tunnel_type", "") == "udp") {
+                                            peerHasDirectP2P = true
+                                            break
+                                        }
                                     }
-                                } else false
-                            } ?: false
+                                }
+                            }
+
+                            // When P2P, find actual tunnel protocol (UDP/TCP) from the conn
+                            var p2pProtocol = ""
+                            if (peerHasDirectP2P && peerObj != null) {
+                                val pConns = peerObj.optJSONArray("conns")
+                                if (pConns != null) {
+                                    for (ci in 0 until pConns.length()) {
+                                        val tunnel = pConns.getJSONObject(ci).optJSONObject("tunnel")
+                                        val tt = tunnel?.optString("tunnel_type", "")
+                                        when (tt) {
+                                            "udp" -> { p2pProtocol = "UDP"; break }
+                                            "tcp" -> if (p2pProtocol.isEmpty()) p2pProtocol = "TCP"
+                                        }
+                                    }
+                                }
+                            }
+                            // Override first-conn protocol with P2P protocol when available
+                            if (peerHasDirectP2P && p2pProtocol.isNotEmpty()) {
+                                protocol = p2pProtocol
+                            }
+
+                            val isRelayed = !peerHasDirectP2P && cost > 0
 
                             val routeCostLabel = when {
                                 cost == 0 -> tr("本机", "Local")
-                                peerHasDirectP2P || cost == 1 -> "p2p"
-                                else -> "relay($cost)"
+                                peerHasDirectP2P -> ""
+                                else -> "relay"
                             }
 
                             var natType = ""
@@ -1426,7 +1453,7 @@ class MainActivity : ComponentActivity() {
                                 ip = peerIp,
                                 hostname = hostname,
                                 version = version,
-                                protocol = "$protocol ($routeCostLabel)",
+                                protocol = if (routeCostLabel.isEmpty()) protocol else routeCostLabel,
                                 latencyUs = latencyUs,
                                 lossRate = lossRate * 100.0,
                                 rxBytes = rx,
@@ -1434,7 +1461,8 @@ class MainActivity : ComponentActivity() {
                                 rxSpeed = downSpeed,
                                 txSpeed = upSpeed,
                                 natType = natType,
-                                peerId = peerId
+                                peerId = peerId,
+                                isRelayed = isRelayed
                             ))
                         }
                     }
@@ -1486,7 +1514,8 @@ class MainActivity : ComponentActivity() {
             rxSpeed = rxRate,
             txSpeed = txRate,
             natType = natStr,
-            peerId = peerId
+            peerId = peerId,
+            isRelayed = false
         )
     }
 
