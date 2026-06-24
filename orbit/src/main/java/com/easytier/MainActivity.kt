@@ -146,7 +146,7 @@ class MainActivity : ComponentActivity() {
                         subLabel = tr("运行中", "Running")
                     )
                     notificationHelper?.showEventNotification(
-                        tr("EasyTier VPN 已连接", "EasyTier VPN Connected"),
+                        tr("Orbit 已连接", "Orbit Connected"),
                         tr("IPv4: $ip | 正在运行", "IPv4: $ip | Running")
                     )
                 }
@@ -159,7 +159,7 @@ class MainActivity : ComponentActivity() {
                     .putBoolean("is_running", false).apply()
                 EasyTierManager.getInstance().stop()
                 notificationHelper?.showEventNotification(
-                    tr("EasyTier VPN 启动失败", "EasyTier VPN Failed"),
+                    tr("Orbit 启动失败", "Orbit Failed"),
                     tr("VPN 权限被拒绝", "VPN permission denied")
                 )
             }
@@ -423,7 +423,7 @@ class MainActivity : ComponentActivity() {
                     subLabel = tr("运行中", "Running"))
                 startPolling()
                 notificationHelper?.showEventNotification(
-                    tr("EasyTier VPN 已连接", "EasyTier VPN Connected"),
+                    tr("Orbit 已连接", "Orbit Connected"),
                     tr("IPv4: ${status.currentIpv4} | 正在运行", "IPv4: ${status.currentIpv4} | Running")
                 )
             } else {
@@ -584,7 +584,7 @@ class MainActivity : ComponentActivity() {
         val zh = langZh
         val title = if (zh) "权限说明" else "Permissions Required"
         val message = if (zh) {
-            "EasyTier VPN 需要以下权限才能正常工作：\n\n" +
+            "Orbit 需要以下权限才能正常工作：\n\n" +
             "🔒 VPN 权限\n" +
             "   创建虚拟网卡 (TUN) — 所有 VPN 应用都需要\n\n" +
             "💾 存储权限\n" +
@@ -595,7 +595,7 @@ class MainActivity : ComponentActivity() {
             "   允许 VPN 在后台持续运行不被系统杀死\n   如拒绝，退出应用后 VPN 可能中断\n\n" +
             "是否授予这些权限？"
         } else {
-            "EasyTier VPN needs the following permissions:\n\n" +
+            "Orbit needs the following permissions:\n\n" +
             "🔒 VPN Permission\n" +
             "   Create virtual TUN adapter — required by all VPN apps\n\n" +
             "💾 Storage Permission\n" +
@@ -1096,7 +1096,7 @@ class MainActivity : ComponentActivity() {
         Intent(Intent.ACTION_SEND).also { intent ->
             intent.type = "text/plain"
             intent.putExtra(Intent.EXTRA_TEXT, toml)
-            intent.putExtra(Intent.EXTRA_SUBJECT, "EasyTier Config: $currentConfigName")
+            intent.putExtra(Intent.EXTRA_SUBJECT, "Orbit Config: $currentConfigName")
             startActivity(Intent.createChooser(intent, tr("分享配置", "Share config")))
         }
     }
@@ -1163,7 +1163,7 @@ class MainActivity : ComponentActivity() {
                                 subLabel = tr("运行中", "Running")
                             )
                             notificationHelper?.showEventNotification(
-                                tr("EasyTier VPN 已连接", "EasyTier VPN Connected"),
+                                tr("Orbit 已连接", "Orbit Connected"),
                                 tr("IPv4: $ip | 正在运行", "IPv4: $ip | Running")
                             )
                         }
@@ -1236,7 +1236,7 @@ class MainActivity : ComponentActivity() {
         peerItems = emptyList()
         updateConnectionState(ConnectionStatus.STOPPED)
         notificationHelper?.showEventNotification(
-            tr("EasyTier VPN 已断开", "EasyTier VPN Disconnected"),
+            tr("Orbit 已断开", "Orbit Disconnected"),
             tr("VPN 服务已停止", "VPN service stopped")
         )
     }

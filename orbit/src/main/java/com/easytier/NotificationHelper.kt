@@ -30,7 +30,7 @@ class NotificationHelper(private val context: Context) {
             nm.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_VPN_STATUS,
-                    "EasyTier VPN 状态",
+                    "Orbit 状态",
                     NotificationManager.IMPORTANCE_LOW   // No sound, shows in shade
                 ).apply {
                     description = "VPN 运行状态通知"
@@ -40,7 +40,7 @@ class NotificationHelper(private val context: Context) {
             nm.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_EVENTS,
-                    "EasyTier VPN 事件",
+                    "Orbit 事件",
                     NotificationManager.IMPORTANCE_DEFAULT  // Sound + heads-up
                 ).apply {
                     description = "VPN 连接/断开/错误事件"
@@ -63,9 +63,9 @@ class NotificationHelper(private val context: Context) {
         langZh: Boolean
     ): Notification {
         val title = if (langZh) {
-            if (isRunning) "EasyTier VPN · 运行中" else "EasyTier VPN"
+            if (isRunning) "Orbit · 运行中" else "Orbit"
         } else {
-            if (isRunning) "EasyTier VPN · Running" else "EasyTier VPN"
+            if (isRunning) "Orbit · Running" else "Orbit"
         }
         val content = if (isRunning) {
             val ipPart = if (ip != null) "IP: $ip" else (if (langZh) "获取中…" else "Connecting…")
