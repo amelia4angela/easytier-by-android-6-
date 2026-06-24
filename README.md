@@ -136,6 +136,14 @@ APK output: `orbit/build/outputs/apk/release/EasyTier-Android-v*.apk`
 
 ---
 
+## 友情链接
+
+| Project | Description |
+|:--------|:------------|
+| [Moonlight V+](https://github.com/qiin2333/moonlight-vplus/releases) | 增强版 Moonlight 游戏串流客户端 |
+| [Sunshine 基地版](https://github.com/AlkaidLab/foundation-sunshine/releases) | 增强版 Sunshine 游戏串流服务端 |
+| [EasyTier](https://github.com/EasyTier/EasyTier) | 轻量级 P2P Mesh VPN（本项目底层引擎） |
+
 ## License
 
 Apache 2.0
