@@ -1,4 +1,4 @@
-# EZ4Android — EasyTier for Android
+# Orbit Easytier For Android
 
 [![GitHub release](https://img.shields.io/github/v/release/amelia4angela/easytier-by-android-6-)](https://github.com/amelia4angela/easytier-by-android-6-/releases)
 [![Platform](https://img.shields.io/badge/Android_6+-6a0dad?logo=android&label=minSdk)](https://developer.android.com/about/versions/marshmallow)
@@ -8,12 +8,12 @@
 
 ---
 
-A modern Android client for [EasyTier](https://github.com/EasyTier/EasyTier) — a secure, P2P mesh VPN.
+A polished Android client for [EasyTier](https://github.com/EasyTier/EasyTier) — secure, P2P mesh VPN, rebuilt from the ground up with a modern UI.
 
-While the official EasyTier does have an Android build (supports **Android 7.0+ / API 24+**), EZ4Android extends one version further down to **Android 6.0 (API 23)** and ships with a polished **Material3 UI** that's cleaner and richer in features.
+While the official EasyTier already has an Android build (supports **Android 7.0+ / API 24+**), Orbit extends one version further to **Android 6.0 (API 23)** and ships a richer native experience with **Material3** design, multi-profile configuration, and real-time peer visualization.
 
-| Feature | Official Android | EZ4Android |
-|:--------|:----------------:|:----------:|
+| Feature | Official Android | Orbit |
+|:--------|:----------------:|:-----:|
 | Minimum Android | 7.0+ (API 24) | **6.0+ (API 23)** |
 | UI Framework | System default | **Material3 (Jetpack Compose)** |
 | Theme | N/A | **Purple gradient, light/dark** |
@@ -55,7 +55,7 @@ While the official EasyTier does have an Android build (supports **Android 7.0+ 
 ## Architecture
 
 ```
-app/
+orbit/
 ├── src/main/java/com/easytier/
 │   ├── MainActivity.kt           # Main entry point
 │   ├── ConfigEditActivity.kt     # TOML configuration editor
@@ -94,10 +94,10 @@ app/
 ```bash
 git clone https://github.com/amelia4angela/easytier-by-android-6-.git
 cd easytier-by-android-6-
-./gradlew assembleRelease
+./gradlew :orbit:assembleRelease
 ```
 
-APK output: `app/build/outputs/apk/release/app-release.apk`
+APK output: `orbit/build/outputs/apk/release/orbit-release.apk`
 
 **Prerequisites:** Android SDK 34, NDK (or use prebuilt jniLibs), Java 17+
 

@@ -169,6 +169,17 @@ private fun PeerRow(item: PeerInfoItem, colors: AppColors, langZh: Boolean) {
                     Text(T("本机", "Self", langZh), color = colors.accentLight, fontSize = 10.sp)
                 }
                 Spacer(Modifier.width(4.dp))
+            } else if (!item.isRelayed) {
+                Spacer(Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(colors.statusGood.copy(alpha = 0.2f))
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                ) {
+                    Text("P2P", color = colors.statusGood, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.width(4.dp))
             }
 
             Text(

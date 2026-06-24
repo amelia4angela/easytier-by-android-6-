@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "EasyTierAndroid"
-include(":app")
+include(":orbit")
