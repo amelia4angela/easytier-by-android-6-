@@ -49,7 +49,7 @@ android {
     applicationVariants.configureEach {
         outputs.configureEach {
             (this as com.android.build.gradle.internal.api.ApkVariantOutputImpl).outputFileName =
-                "EasyTier-Android-v${versionName}.apk"
+                "Orbit-v${versionName}.apk"
         }
     }
 
