@@ -923,7 +923,7 @@ fun AboutPage(
                             .clickable {
                                 val intent = android.content.Intent(
                                     android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://github.com/amelia4angela/easytier-by-android-6-")
+                                    android.net.Uri.parse("https://github.com/amelia4angela/orbit-easytier-android")
                                 )
                                 context.startActivity(intent)
                             }
@@ -993,7 +993,7 @@ fun AboutPage(
                                             try {
                                                 val result = withContext(Dispatchers.IO) {
                                                     val conn = URL(
-                                                        "https://api.github.com/repos/amelia4angela/easytier-by-android-6-/releases/latest"
+                                                        "https://api.github.com/repos/amelia4angela/orbit-easytier-android/releases/latest"
                                                     ).openConnection() as HttpURLConnection
                                                     conn.setRequestProperty("Accept", "application/vnd.github+json")
                                                     conn.setRequestProperty("User-Agent", "EasyTier-Android")
@@ -1092,7 +1092,7 @@ fun AboutPage(
                                         val intent = android.content.Intent(
                                             android.content.Intent.ACTION_VIEW,
                                             android.net.Uri.parse(
-                                                "https://github.com/amelia4angela/easytier-by-android-6-/releases/tag/$ver"
+                                                "https://github.com/amelia4angela/orbit-easytier-android/releases/tag/$ver"
                                             )
                                         )
                                         context.startActivity(intent)

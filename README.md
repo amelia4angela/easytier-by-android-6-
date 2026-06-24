@@ -1,10 +1,10 @@
 # Orbit Easytier For Android
 
-[![GitHub release](https://img.shields.io/github/v/release/amelia4angela/easytier-by-android-6-)](https://github.com/amelia4angela/easytier-by-android-6-/releases)
+[![GitHub release](https://img.shields.io/github/v/release/amelia4angela/orbit-easytier-android)](https://github.com/amelia4angela/orbit-easytier-android/releases)
 [![Platform](https://img.shields.io/badge/Android_6+-6a0dad?logo=android&label=minSdk)](https://developer.android.com/about/versions/marshmallow)
 [![UI](https://img.shields.io/badge/UI-Material3-7C3AED?logo=materialdesign)](https://m3.material.io/)
 [![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/amelia4angela/easytier-by-android-6-/total?color=success)](https://github.com/amelia4angela/easytier-by-android-6-/releases)
+[![Downloads](https://img.shields.io/github/downloads/amelia4angela/orbit-easytier-android/total?color=success)](https://github.com/amelia4angela/orbit-easytier-android/releases)
 
 ---
 
@@ -92,8 +92,8 @@ orbit/
 ## Building from source
 
 ```bash
-git clone https://github.com/amelia4angela/easytier-by-android-6-.git
-cd easytier-by-android-6-
+git clone https://github.com/amelia4angela/orbit-easytier-android.git
+cd orbit-easytier-android
 ./gradlew :orbit:assembleRelease
 ```
 
@@ -105,7 +105,7 @@ APK output: `orbit/build/outputs/apk/release/orbit-release.apk`
 
 ## Download
 
-### [⬇️ Download APK (latest release)](https://github.com/amelia4angela/easytier-by-android-6-/releases)
+### [⬇️ Download APK (latest release)](https://github.com/amelia4angela/orbit-easytier-android/releases)
 
 ---
 
