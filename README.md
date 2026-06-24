@@ -10,11 +10,11 @@
 
 A modern Android client for [EasyTier](https://github.com/EasyTier/EasyTier) — a secure, P2P mesh VPN.
 
-While the official EasyTier does have an Android build, it only supports **Android 10+ (API 29+)**. This fork extends compatibility down to **Android 6.0 (API 23)**, and ships with a polished **Material3 UI** that's easier on the eyes.
+While the official EasyTier does have an Android build (supports **Android 7.0+ / API 24+**), EZ4Android extends one version further down to **Android 6.0 (API 23)** and ships with a polished **Material3 UI** that's cleaner and richer in features.
 
 | Feature | Official Android | EZ4Android |
 |:--------|:----------------:|:----------:|
-| Minimum Android | 10+ (API 29) | **6.0+ (API 23)** |
+| Minimum Android | 7.0+ (API 24) | **6.0+ (API 23)** |
 | UI Framework | System default | **Material3 (Jetpack Compose)** |
 | Theme | N/A | **Purple gradient, light/dark** |
 | Configuration UI | Basic | **Full editor with TOML support** |
