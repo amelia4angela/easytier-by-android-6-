@@ -739,7 +739,7 @@ private fun MoreTab(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        T("关于 EasyTier", "About EasyTier", langZh),
+                        T("关于 Orbit", "About Orbit", langZh),
                         color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium
                     )
                     Text(
@@ -821,7 +821,7 @@ fun AboutPage(
                 Text("← " + T("返回", "Back", langZh), color = colors.accentLight, fontSize = 13.sp)
             }
             Text(
-                T("关于 EasyTier", "About EasyTier", langZh),
+                T("关于 Orbit", "About Orbit", langZh),
                 color = colors.textPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
