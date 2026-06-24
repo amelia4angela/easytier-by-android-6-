@@ -46,6 +46,13 @@ android {
         compose = true
     }
 
+    applicationVariants.configureEach {
+        outputs.configureEach {
+            (this as com.android.build.gradle.internal.api.ApkVariantOutputImpl).outputFileName =
+                "EasyTier-Android-v${versionName}.apk"
+        }
+    }
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }

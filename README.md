@@ -97,7 +97,7 @@ cd orbit-easytier-android
 ./gradlew :orbit:assembleRelease
 ```
 
-APK output: `orbit/build/outputs/apk/release/orbit-release.apk`
+APK output: `orbit/build/outputs/apk/release/EasyTier-Android-v*.apk`
 
 **Prerequisites:** Android SDK 34, NDK (or use prebuilt jniLibs), Java 17+
 
