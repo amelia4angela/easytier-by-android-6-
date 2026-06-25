@@ -932,13 +932,6 @@ class MainActivity : ComponentActivity() {
             prefs.edit().clear().apply()
             AppLogger.i("MainActivity", "Configs migrated from SharedPreferences to files")
         }
-        if (currentConfigName != "default") {
-            val f = File(configsDir, "${sanitizeName(currentConfigName)}.json")
-            if (!f.exists()) {
-                currentConfigName = "default"
-                loadConfig("default")
-            }
-        }
     }
 
     private fun saveConfig(name: String) {
@@ -977,6 +970,9 @@ class MainActivity : ComponentActivity() {
             try {
                 applyFields(JSONObject(file.readText()))
                 currentConfigName = name
+                // Persist last config name so it survives app restart
+                getSharedPreferences(PREFS_STATE, MODE_PRIVATE).edit()
+                    .putString("last_config_name", name).apply()
                 AppLogger.i("MainActivity", "Config loaded: $name")
             } catch (t: Throwable) {
                 Toast.makeText(this,
