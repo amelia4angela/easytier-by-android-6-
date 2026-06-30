@@ -1342,9 +1342,14 @@ class MainActivity : ComponentActivity() {
                             .awaitAll()
                             .toMap()
                     }
-                    newPeers.replaceAll { peer ->
+                    // Use indexed loop, not replaceAll { } — Java 8 List.replaceAll is a
+                    // member method, which D8 desugars into ExternalSyntheticLambda.
+                    // During incremental builds that class may not be in dex → crash.
+                    // Indexed loop: no lambda, no desugaring, no crash.
+                    for (i in newPeers.indices) {
+                        val peer = newPeers[i]
                         val pingUs = pingResults[peer.ip] ?: -1L
-                        if (pingUs > 0) peer.copy(latencyUs = pingUs) else peer
+                        if (pingUs > 0) newPeers[i] = peer.copy(latencyUs = pingUs)
                     }
                 } catch (e: Exception) {
                     AppLogger.e("PingLatency", "ping failed, falling back to daemon latency", e)

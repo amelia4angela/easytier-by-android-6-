@@ -11,7 +11,7 @@ android {
         applicationId = "com.easytier.easytiervpn"
         minSdk = 23
         targetSdk = 34
-        versionCode = 7
+        versionCode = 8
         versionName = "0.1.6"
     }
 
