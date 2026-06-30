@@ -1336,14 +1336,18 @@ class MainActivity : ComponentActivity() {
             // ── Ping all peers in parallel for real-time RTT ──
             // Replaces daemon's slow path_latency (5-10s update) with 1s-precision ping
             if (newPeers.isNotEmpty()) {
-                val pingResults = withContext(Dispatchers.IO) {
-                    newPeers.map { peer -> async { peer.ip to pingPeer(peer.ip) } }
-                        .awaitAll()
-                        .toMap()
-                }
-                newPeers.replaceAll { peer ->
-                    val pingUs = pingResults[peer.ip] ?: -1L
-                    if (pingUs > 0) peer.copy(latencyUs = pingUs) else peer
+                try {
+                    val pingResults = withContext(Dispatchers.IO) {
+                        newPeers.map { peer -> async { peer.ip to pingPeer(peer.ip) } }
+                            .awaitAll()
+                            .toMap()
+                    }
+                    newPeers.replaceAll { peer ->
+                        val pingUs = pingResults[peer.ip] ?: -1L
+                        if (pingUs > 0) peer.copy(latencyUs = pingUs) else peer
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e("PingLatency", "ping failed, falling back to daemon latency", e)
                 }
             }
 
