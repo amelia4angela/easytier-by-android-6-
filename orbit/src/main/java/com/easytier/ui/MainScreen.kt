@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import org.json.JSONObject
 
 private enum class Tab { STATUS, CONFIG, MORE }
 
@@ -547,8 +548,8 @@ private fun MoreTab(
     val version: String = remember {
         try {
             val pkg = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
-            pkg.versionName ?: "0.1.3"
-        } catch (_: Exception) { "0.1.3" }
+            pkg.versionName ?: "0.1.5"
+        } catch (_: Exception) { "0.1.5" }
     }
     val colors = currentColors()
     val scrollState = rememberScrollState()
@@ -770,8 +771,8 @@ fun AboutPage(
     val version: String = remember {
         try {
             val pkg = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
-            pkg.versionName ?: "0.1.3"
-        } catch (_: Exception) { "0.1.3" }
+            pkg.versionName ?: "0.1.5"
+        } catch (_: Exception) { "0.1.5" }
     }
     val colors = currentColors()
     val scrollState = rememberScrollState()
@@ -1002,9 +1003,7 @@ fun AboutPage(
                                                     val code = conn.responseCode
                                                     if (code == 200) {
                                                         val body = conn.inputStream.bufferedReader().readText()
-                                                        val tagStart = body.indexOf("\"tag_name\":\"") + "\"tag_name\":\"".length
-                                                        val tagEnd = body.indexOf("\"", tagStart)
-                                                        body.substring(tagStart, tagEnd)
+                                                        JSONObject(body).getString("tag_name")
                                                     } else {
                                                         null
                                                     }

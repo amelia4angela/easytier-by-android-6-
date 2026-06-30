@@ -33,6 +33,8 @@ class EasyTierVpnService : VpnService() {
         @Volatile var currentIp: String? = null
         /** Timestamp when the service was started (for duration calculation) */
         @Volatile var serviceStartedAt: Long = 0L
+        /** Language flag — set by MainActivity before starting the service */
+        @Volatile var langZh: Boolean = true
     }
 
     @Volatile private var vpnInterface: ParcelFileDescriptor? = null
@@ -103,7 +105,7 @@ class EasyTierVpnService : VpnService() {
             startForeground(
                 NotificationHelper.NOTIFY_ID_VPN,
                 notificationHelper!!.buildVpnNotification(
-                    currentIp, "0s", isRunning = true, langZh = true
+                    currentIp, "0s", isRunning = true, langZh = langZh
                 )
             )
             // Start periodic notification update
@@ -159,7 +161,7 @@ class EasyTierVpnService : VpnService() {
                 ip = currentIp,
                 durationText = elapsed,
                 isRunning = true,
-                langZh = true
+                langZh = langZh
             )
         } catch (_: Exception) { }
     }

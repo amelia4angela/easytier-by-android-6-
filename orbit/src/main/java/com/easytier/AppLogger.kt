@@ -4,6 +4,7 @@ import android.util.Log
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.collections.ArrayDeque
 
 /**
  * 日志缓冲区：同时输出到 logcat + 内存缓冲区
@@ -11,7 +12,7 @@ import java.util.Locale
  */
 object AppLogger {
     private const val MAX_LINES = 300
-    private val buffer = ArrayList<String>()
+    private val buffer = ArrayDeque<String>(300)
     private val dateFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 
     @Synchronized
@@ -56,9 +57,9 @@ object AppLogger {
 
     private fun append(level: String, tag: String, msg: String) {
         val time = dateFormat.format(Date())
-        buffer.add("$time $level/$tag: $msg")
+        buffer.addLast("$time $level/$tag: $msg")
         if (buffer.size > MAX_LINES) {
-            buffer.removeAt(0)
+            buffer.removeFirst()
         }
     }
 

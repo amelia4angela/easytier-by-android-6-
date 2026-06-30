@@ -109,12 +109,15 @@ object TomlUtils {
     //  ConfigState → TOML (export + daemon start)
     // ═══════════════════════════════════════════════
 
+    /** Escape a string value for TOML double-quoted string. */
+    private fun escapeToml(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
+
     /** Build TOML string from [ConfigState] for the EasyTier daemon. */
     fun buildToml(s: ConfigState): String {
         val sb = StringBuilder()
 
-        val networkName = s.networkName.ifEmpty { TOML_FIELD_EMPTY }
-        val networkSecret = s.secret.ifEmpty { TOML_FIELD_EMPTY }
+        val networkName = escapeToml(s.networkName.ifEmpty { TOML_FIELD_EMPTY })
+        val networkSecret = escapeToml(s.secret.ifEmpty { TOML_FIELD_EMPTY })
         val server = s.server.ifEmpty { TOML_FIELD_EMPTY }
         val port = s.port.ifEmpty { TOML_FIELD_EMPTY }
         val ipAddr = s.ipAddress.ifEmpty { TOML_FIELD_EMPTY }
@@ -123,8 +126,8 @@ object TomlUtils {
             "tcp://$server:$port"
         else
             "tcp://$TOML_FIELD_EMPTY"
-        val instanceName = s.instanceName.ifEmpty { "default" }
-        val hostname = s.hostname.ifEmpty { TOML_FIELD_EMPTY }
+        val instanceName = escapeToml(s.instanceName.ifEmpty { "default" })
+        val hostname = escapeToml(s.hostname.ifEmpty { TOML_FIELD_EMPTY })
 
         sb.append("instance_name = \"$instanceName\"\n")
         if (hostname.isNotEmpty()) sb.append("hostname = \"$hostname\"\n")
@@ -140,7 +143,7 @@ object TomlUtils {
 
         if (s.disableIpv6) sb.append("disable_ipv6 = true\n")
         if (s.noTun) sb.append("no_tun = true\n")
-        if (s.bindDevice.isNotEmpty()) sb.append("bind_device = \"${s.bindDevice}\"\n")
+        if (s.bindDevice.isNotEmpty()) sb.append("bind_device = \"${escapeToml(s.bindDevice)}\"\n")
 
         if (s.disableP2p) sb.append("disable_p2p = true\n")
         if (s.p2pOnly) sb.append("p2p_only = true\n")
@@ -168,7 +171,7 @@ object TomlUtils {
         if (s.privateMode) sb.append("private_mode = true\n")
         if (s.acceptDns) sb.append("accept_dns = true\n")
 
-        if (s.socks5.isNotEmpty()) sb.append("socks5 = \"${s.socks5}\"\n")
+        if (s.socks5.isNotEmpty()) sb.append("socks5 = \"${escapeToml(s.socks5)}\"\n")
 
         if (s.portForward.isNotEmpty()) {
             val parts = s.portForward.split("://")
@@ -178,30 +181,30 @@ object TomlUtils {
                     val localPart = parts[1].substring(0, slashIdx)
                     val remotePart = parts[1].substring(slashIdx + 1)
                     sb.append("[[port_forward]]\n")
-                    sb.append("port_forward_protocol = \"${parts[0]}\"\n")
-                    sb.append("port_forward_local = \"$localPart\"\n")
-                    sb.append("port_forward_remote = \"$remotePart\"\n")
+                    sb.append("port_forward_protocol = \"${escapeToml(parts[0])}\"\n")
+                    sb.append("port_forward_local = \"${escapeToml(localPart)}\"\n")
+                    sb.append("port_forward_remote = \"${escapeToml(remotePart)}\"\n")
                 }
             }
         }
 
         if (s.encryptAlgo.isNotEmpty())
-            sb.append("encryption_algorithm = \"${s.encryptAlgo}\"\n")
+            sb.append("encryption_algorithm = \"${escapeToml(s.encryptAlgo)}\"\n")
         if (s.compression.isNotEmpty() && s.compression != "none")
-            sb.append("compression = \"${s.compression}\"\n")
+            sb.append("compression = \"${escapeToml(s.compression)}\"\n")
 
         if (s.proxyNetworks.isNotEmpty()) {
             s.proxyNetworks.split(",").forEach { cidr ->
                 val c = cidr.trim()
                 if (c.isNotEmpty())
-                    sb.append("[[proxy_networks]]\nproxy_network_cidr = \"$c\"\n")
+                    sb.append("[[proxy_networks]]\nproxy_network_cidr = \"${escapeToml(c)}\"\n")
             }
         }
 
         if (s.exitNodes.isNotEmpty()) {
             s.exitNodes.split(",").forEach { vip ->
                 val v = vip.trim()
-                if (v.isNotEmpty()) sb.append("[[exit_nodes]]\nnode = \"$v\"\n")
+                if (v.isNotEmpty()) sb.append("[[exit_nodes]]\nnode = \"${escapeToml(v)}\"\n")
             }
         }
 
@@ -246,13 +249,15 @@ object TomlUtils {
                 "network_name" -> j.put("networkName", value)
                 "network_secret" -> j.put("secret", value)
                 "uri" -> {
-                    val parts = value.split("://")
-                    if (parts.size == 2) {
-                        val hostPort = parts[1].split(":")
-                        if (hostPort.size == 2) {
-                            j.put("server", hostPort[0])
-                            j.put("port", hostPort[1])
-                        } else { j.put("server", parts[1]) }
+                    if (!j.has("server")) {
+                        val parts = value.split("://")
+                        if (parts.size == 2) {
+                            val hostPort = parts[1].split(":")
+                            if (hostPort.size == 2) {
+                                j.put("server", hostPort[0])
+                                j.put("port", hostPort[1])
+                            } else { j.put("server", parts[1]) }
+                        }
                     }
                 }
                 "disable_ipv6" -> j.put("disableIpv6", parseBool(rawValue))

@@ -36,6 +36,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
 import com.easytier.ui.theme.currentColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -46,11 +48,14 @@ import com.easytier.AppLogger
 import com.easytier.jni.EasyTierJNI
 import com.easytier.jni.EasyTierManager
 import com.easytier.jni.ipv4IntToString
+import com.easytier.vpn.EasyTierVpnService
 import com.easytier.ui.*
 import com.easytier.ui.theme.EasyTierTheme
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -83,6 +88,9 @@ class MainActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var notificationHelper: NotificationHelper? = null
     private val prevPeerStats = HashMap<Int, Pair<Long, Long>>()
+    private val smoothedSpeeds = HashMap<Int, Pair<Float, Float>>()
+    private var smoothedTotalRx = 0f
+    private var smoothedTotalTx = 0f
 
     // ── Compose-Observed State ──
     private var langZh by mutableStateOf(true)
@@ -142,6 +150,7 @@ class MainActivity : ComponentActivity() {
                 val ip = status.currentIpv4
                 val cidrs = status.currentProxyCidrs
                 if (ip != null) {
+                    EasyTierVpnService.langZh = this@MainActivity.langZh
                     mgr.restartVpnService(ip, cidrs)
                     startPolling()
                     updateConnectionState(
@@ -420,6 +429,8 @@ class MainActivity : ComponentActivity() {
             AppLogger.i("MainActivity", "Manager singleton is running — reconnecting UI")
             isRunning = true
             startedAt = System.currentTimeMillis()
+            // Load config so the config tab shows correct values
+            loadConfig(currentConfigName)
             val status = EasyTierManager.getInstance().getStatus()
             if (status.currentIpv4 != null) {
                 updateConnectionState(ConnectionStatus.RUNNING,
@@ -963,6 +974,7 @@ class MainActivity : ComponentActivity() {
                             AppLogger.i("MainActivity", "Requesting VPN permission…")
                             vpnPermissionLauncher.launch(vpnIntent)
                         } else {
+                            EasyTierVpnService.langZh = this@MainActivity.langZh
                             mgr.restartVpnService(ip, cidrs)
                             startPolling()
                             updateConnectionState(
@@ -1055,7 +1067,7 @@ class MainActivity : ComponentActivity() {
         pollingJob = lifecycleScope.launch(Dispatchers.Main) {
             while (isActive && this@MainActivity.isRunning) {
                 refreshPeerInfo()
-                delay(500L)
+                delay(1000L)
             }
         }
     }
@@ -1063,6 +1075,31 @@ class MainActivity : ComponentActivity() {
     private fun stopPolling() {
         pollingJob?.cancel()
         pollingJob = null
+    }
+
+    // ═══════════════════════════════════════════════
+    //  Ping-based Real-Time Latency
+    // ═══════════════════════════════════════════════
+
+    /** Ping a virtual IP and return RTT in microseconds, or -1 on failure. */
+    private fun pingPeer(ipCidr: String): Long {
+        val cleanIp = ipCidr.split("/")[0]
+        return try {
+            val process = Runtime.getRuntime().exec("ping -c 1 -W 2 $cleanIp")
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val output = reader.readText()
+            reader.close()
+            val exitCode = process.waitFor()
+            if (exitCode != 0) return -1L
+            // Parse "time=XX.X ms" or "time=XX ms"
+            val matcher = Regex("""time=([\d.]+)\s*ms""").find(output)
+            if (matcher != null) {
+                val ms = matcher.groupValues[1].toDouble()
+                (ms * 1000).toLong() // microseconds
+            } else -1L
+        } catch (_: Exception) {
+            -1L
+        }
     }
 
     // ═══════════════════════════════════════════════
@@ -1160,44 +1197,89 @@ class MainActivity : ComponentActivity() {
 
                             val peerObj = peerMap[peerId]
                             var protocol = "?"
-                            var latencyUs: Long = pathLatencyUs
+                            var latencyUs = pathLatencyUs  // fallback when no conn stats
                             var lossRate = 0.0
                             var rx = 0L; var tx = 0L
+                            var hasDirectTunnel = false
+                            var p2pProtocol = ""
 
                             if (peerObj != null) {
                                 val conns = peerObj.optJSONArray("conns")
                                 if (conns != null && conns.length() > 0) {
                                     for (ci in 0 until conns.length()) {
                                         val conn = conns.getJSONObject(ci)
+                                        val tunnel = conn.optJSONObject("tunnel")
                                         if (ci == 0) {
-                                            val tunnel = conn.optJSONObject("tunnel")
                                             protocol = tunnel?.optString("tunnel_type", "?") ?: "?"
                                             lossRate = conn.optDouble("loss_rate", 0.0)
                                         }
+                                        // Detect direct tunnels during first pass — avoids re-scanning conns
+                                        // Only UDP is P2P; TCP is relay (EasyTier convention)
+                                        if (tunnel != null) {
+                                            val tt = tunnel.optString("tunnel_type", "")
+                                            if (tt == "udp") {
+                                                hasDirectTunnel = true
+                                                p2pProtocol = "UDP"
+                                            } else if (tt == "tcp" && p2pProtocol.isEmpty()) {
+                                                p2pProtocol = "TCP"
+                                            }
+                                        }
                                         val stats = conn.optJSONObject("stats")
                                         if (stats != null) {
-                                            val slat = stats.optLong("latency_us", 0)
-                                            if (slat > 0 && (ci == 0 || slat < latencyUs)) latencyUs = slat
+                                            // First conn's latency overrides route path_latency
+                                            // Try multiple field names across different nesting levels
+                                            if (ci == 0) {
+                                                var slat = stats.optLong("latency_us", 0L)
+                                                if (slat <= 0L) slat = stats.optLong("rtt_us", 0L)
+                                                if (slat <= 0L) slat = stats.optLong("latest_rtt_us", 0L)
+                                                if (slat <= 0L) slat = stats.optLong("avg_rtt_us", 0L)
+                                                if (slat <= 0L) slat = conn.optLong("rtt", 0L) * 1000L
+                                                if (slat <= 0L) slat = conn.optLong("latency", 0L) * 1000L
+                                                if (slat <= 0L) slat = conn.optLong("latest_rtt_us", 0L)
+                                                if (slat <= 0L && tunnel != null) {
+                                                    slat = tunnel.optLong("rtt_us", 0L)
+                                                    if (slat <= 0L) slat = tunnel.optLong("rtt", 0L) * 1000L
+                                                }
+                                                if (slat > 0L) latencyUs = slat
+                                            }
                                             rx += stats.optLong("rx_bytes", 0)
                                             tx += stats.optLong("tx_bytes", 0)
                                         }
                                     }
                                 }
+                                // Override protocol with P2P-specific label when direct tunnel found
+                                if (p2pProtocol.isNotEmpty()) protocol = p2pProtocol
                             }
 
                             var downSpeed = ""; var upSpeed = ""
-                            if (dt > 0.5) {
+                            if (dt > 0.25) {
                                 val prev = prevPeerStats[peerId]
                                 if (prev != null) {
                                     val rxDelta = rx - prev.first
                                     val txDelta = tx - prev.second
-                                    if (rxDelta >= 0) downSpeed = formatSpeed((rxDelta / dt).toLong())
-                                    if (txDelta >= 0) upSpeed = formatSpeed((txDelta / dt).toLong())
+                                    if (rxDelta >= 0 && txDelta >= 0) {
+                                        // Exponential moving average: alpha=0.25 — smooths jumps
+                                        // while still being responsive within ~2s
+                                        val rawRx = (rxDelta / dt).toFloat()
+                                        val rawTx = (txDelta / dt).toFloat()
+                                        val sm = smoothedSpeeds[peerId] ?: Pair(rawRx, rawTx)
+                                        val sr = sm.first * 0.75f + rawRx * 0.25f
+                                        val st = sm.second * 0.75f + rawTx * 0.25f
+                                        smoothedSpeeds[peerId] = Pair(sr, st)
+                                        downSpeed = formatSpeed(sr.toLong())
+                                        upSpeed = formatSpeed(st.toLong())
+                                    }
+                                } else {
+                                    // First sample — initialize smoothed value directly
+                                    // so first display isn't 0
+                                    val rawRx = rx / dt
+                                    val rawTx = tx / dt
+                                    smoothedSpeeds[peerId] = Pair(rawRx.toFloat(), rawTx.toFloat())
+                                    downSpeed = formatSpeed(rawRx.toLong())
+                                    upSpeed = formatSpeed(rawTx.toLong())
                                 }
-                                prevPeerStats[peerId] = Pair(rx, tx)
-                            } else {
-                                prevPeerStats[peerId] = Pair(rx, tx)
                             }
+                            prevPeerStats[peerId] = Pair(rx, tx)
 
                             val cost = route.optInt("cost", 0)
 
@@ -1205,38 +1287,9 @@ class MainActivity : ComponentActivity() {
                             // Primary: directly_connected_conns (authoritative, set by PeerManager)
                             val directlyConnected = peerObj?.optJSONArray("directly_connected_conns")
                             var peerHasDirectP2P = directlyConnected != null && directlyConnected.length() > 0
-                            // Fallback: if peer has a UDP tunnel, it's definitely P2P (UDP-only for P2P)
-                            if (!peerHasDirectP2P && peerObj != null && cost > 0) {
-                                val pConns = peerObj.optJSONArray("conns")
-                                if (pConns != null) {
-                                    for (ci in 0 until pConns.length()) {
-                                        val tunnel = pConns.getJSONObject(ci).optJSONObject("tunnel")
-                                        if (tunnel?.optString("tunnel_type", "") == "udp") {
-                                            peerHasDirectP2P = true
-                                            break
-                                        }
-                                    }
-                                }
-                            }
-
-                            // When P2P, find actual tunnel protocol (UDP/TCP) from the conn
-                            var p2pProtocol = ""
-                            if (peerHasDirectP2P && peerObj != null) {
-                                val pConns = peerObj.optJSONArray("conns")
-                                if (pConns != null) {
-                                    for (ci in 0 until pConns.length()) {
-                                        val tunnel = pConns.getJSONObject(ci).optJSONObject("tunnel")
-                                        val tt = tunnel?.optString("tunnel_type", "")
-                                        when (tt) {
-                                            "udp" -> { p2pProtocol = "UDP"; break }
-                                            "tcp" -> if (p2pProtocol.isEmpty()) p2pProtocol = "TCP"
-                                        }
-                                    }
-                                }
-                            }
-                            // Override first-conn protocol with P2P protocol when available
-                            if (peerHasDirectP2P && p2pProtocol.isNotEmpty()) {
-                                protocol = p2pProtocol
+                            // Fallback: any UDP/TCP tunnel = direct connection (already scanned above)
+                            if (!peerHasDirectP2P && hasDirectTunnel && cost > 0) {
+                                peerHasDirectP2P = true
                             }
 
                             val isRelayed = !peerHasDirectP2P && cost > 0
@@ -1278,6 +1331,21 @@ class MainActivity : ComponentActivity() {
             // Clean up stale peer stats for disconnected peers
             val currentPeerIds = newPeers.map { it.peerId }.toSet()
             prevPeerStats.keys.removeAll { it !in currentPeerIds }
+            smoothedSpeeds.keys.removeAll { it !in currentPeerIds }
+
+            // ── Ping all peers in parallel for real-time RTT ──
+            // Replaces daemon's slow path_latency (5-10s update) with 1s-precision ping
+            if (newPeers.isNotEmpty()) {
+                val pingResults = withContext(Dispatchers.IO) {
+                    newPeers.map { peer -> async { peer.ip to pingPeer(peer.ip) } }
+                        .awaitAll()
+                        .toMap()
+                }
+                newPeers.replaceAll { peer ->
+                    val pingUs = pingResults[peer.ip] ?: -1L
+                    if (pingUs > 0) peer.copy(latencyUs = pingUs) else peer
+                }
+            }
 
             peerStatsTime = now
             peerItems = newPeers
@@ -1308,8 +1376,12 @@ class MainActivity : ComponentActivity() {
 
         var totalTx = 0L; var totalRx = 0L
         for ((_, v) in prevPeerStats) { totalTx += v.second; totalRx += v.first }
-        val txRate = if (dt > 0.5) formatSpeed((totalTx / dt).toLong()) else ""
-        val rxRate = if (dt > 0.5) formatSpeed((totalRx / dt).toLong()) else ""
+        val txRaw = totalTx / dt
+        val rxRaw = totalRx / dt
+        smoothedTotalTx = smoothedTotalTx * 0.75f + txRaw.toFloat() * 0.25f
+        smoothedTotalRx = smoothedTotalRx * 0.75f + rxRaw.toFloat() * 0.25f
+        val txRate = if (dt > 0.25) formatSpeed(smoothedTotalTx.toLong()) else ""
+        val rxRate = if (dt > 0.25) formatSpeed(smoothedTotalRx.toLong()) else ""
 
         return PeerInfoItem(
             isSelf = true,
@@ -1338,7 +1410,7 @@ class MainActivity : ComponentActivity() {
         if (requestCode == REQUEST_EDIT_CONFIG) {
             if (resultCode == RESULT_OK && data != null) {
                 val selected = data.getStringExtra(ConfigEditActivity.EXTRA_CONFIG_NAME)
-                if (selected != null && selected != currentConfigName) {
+                if (selected != null) {
                     loadConfig(selected)
                 }
             }
@@ -1421,8 +1493,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun fetchConfigFromServer(url: String) {
-        Toast.makeText(this, tr("\u6b63\u5728\u83b7\u53d6\u2026", "Fetching\u2026"), Toast.LENGTH_SHORT).show()
-        Thread {
+        Toast.makeText(this, tr("正在获取…", "Fetching…"), Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
                 connection.connectTimeout = 10000
@@ -1430,19 +1502,19 @@ class MainActivity : ComponentActivity() {
                 val text = connection.inputStream.bufferedReader().use { it.readText() }
                 connection.disconnect()
 
-                mainHandler.post {
+                withContext(Dispatchers.Main) {
                     configState = TomlUtils.jsonToConfigState(TomlUtils.parseTomlToJson(text))
                     saveConfig(currentConfigName)
-                    Toast.makeText(this, tr("\u914d\u7f6e\u5df2\u52a0\u8f7d", "Config loaded"), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, tr("配置已加载", "Config loaded"), Toast.LENGTH_SHORT).show()
                     AppLogger.i("MainActivity", "Config loaded from server: $url")
                 }
             } catch (t: Throwable) {
-                mainHandler.post {
-                    Toast.makeText(this, tr("\u83b7\u53d6\u5931\u8d25: ${t.message}", "Failed: ${t.message}"), Toast.LENGTH_LONG).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, tr("获取失败: ${t.message}", "Failed: ${t.message}"), Toast.LENGTH_LONG).show()
                     AppLogger.e("MainActivity", "Config server fetch error", t)
                 }
             }
-        }.start()
+        }
     }
 
     // ═══════════════════════════════════════════════
@@ -1454,6 +1526,7 @@ class MainActivity : ComponentActivity() {
     // ═══════════════════════════════════════════════
 
     private fun formatSpeed(bytesPerSec: Long): String = when {
+        bytesPerSec >= 1_000_000_000 -> "%.2f GB".format(bytesPerSec / 1_000_000_000.0)
         bytesPerSec >= 1_000_000 -> "%.1f MB".format(bytesPerSec / 1_000_000.0)
         bytesPerSec >= 1_000 -> "%.1f KB".format(bytesPerSec / 1_000.0)
         bytesPerSec >= 0 -> "${bytesPerSec} B"

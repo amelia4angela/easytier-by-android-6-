@@ -83,7 +83,9 @@ fun PeerInfoSection(
                 }
 
                 allNodes.forEachIndexed { index, item ->
-                    PeerRow(item = item, colors = colors, langZh = langZh)
+                    key(item.ip) {
+                        PeerRow(item = item, colors = colors, langZh = langZh)
+                    }
                     if (index < allNodes.size - 1) {
                         Box(
                             modifier = Modifier
@@ -240,8 +242,12 @@ private fun PeerDetailGrid(item: PeerInfoItem, colors: AppColors, langZh: Boolea
         T("NAT", "NAT", langZh) to item.natType.ifEmpty { "—" },
         T("版本", "Version", langZh) to item.version.ifEmpty { "—" },
         T("丢包率", "Loss", langZh) to String.format("%.1f%%", item.lossRate),
-        T("上行", "TX", langZh) to item.txSpeed.ifEmpty { "0 B/s" },
-        T("下行", "RX", langZh) to item.rxSpeed.ifEmpty { "0 B/s" },
+        T("上行", "TX", langZh) to item.txSpeed.ifEmpty {
+            if (item.isRelayed) "—" else "0 B/s"
+        },
+        T("下行", "RX", langZh) to item.rxSpeed.ifEmpty {
+            if (item.isRelayed) "—" else "0 B/s"
+        },
         T("延迟", "Latency", langZh) to formatLatencyShort(item.latencyUs),
     )
     rows.chunked(2).forEach { pair ->
@@ -266,8 +272,9 @@ private fun PeerDetailGrid(item: PeerInfoItem, colors: AppColors, langZh: Boolea
 }
 
 private fun formatLatencyShort(us: Long): String = when {
+    us >= 60_000_000 -> String.format("%.1fm", us / 60_000_000.0)
     us >= 1_000_000 -> String.format("%.1fs", us / 1_000_000.0)
-    us >= 1_000 -> "${us / 1_000}ms"
+    us >= 1_000 -> String.format("%.1fms", us / 1000.0)
     us > 0 -> "${us}μs"
     else -> "—"
 }

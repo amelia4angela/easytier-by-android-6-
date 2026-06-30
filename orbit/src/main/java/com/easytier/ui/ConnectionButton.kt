@@ -69,6 +69,7 @@ fun ControlFAB(
                 onClick = {
                     pressed = true
                     onClick()
+                    pressed = false
                 }
             ),
         contentAlignment = Alignment.Center
