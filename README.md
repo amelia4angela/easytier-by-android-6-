@@ -111,6 +111,20 @@ APK output: `orbit/build/outputs/apk/release/EasyTier-Android-v*.apk`
 
 ## Changelog
 
+### v0.1.4
+
+- 🐛 **Config persistence fix** — `last_config_name` now saved on every config load, preventing config loss on app restart
+- 🔄 **Coroutine-based polling** — migrated from `Handler`+`Runnable` to `lifecycleScope` coroutines, eliminating main thread blocking (~200-500ms per JNI call)
+- 🧹 **TOML builder refactored** — extracted shared ConfigState↔JSON↔TOML logic into `TomlUtils`, removed ~73 lines of duplicated code across two activities
+- 🛡️ **Code quality fixes** — fixed credential exposure in defaults, socks5 TOML quoting, API 30 guard for external storage, log dialog coroutine leak, unbounded `prevPeerStats` growth
+- ⚡ **Faster UI updates** — increased poll frequency from 1s to 500ms for more responsive latency/peer display
+
+### v0.1.3
+
+- 🎨 **UI polish** — layout adjustments for small screens, transparent input backgrounds, shorter action labels
+- 🐛 **Bug fixes** — `ConfigEditActivity` fields now correctly sync to `buildTomlConfig` and `mgr.start()` args
+- 📝 **Better logging** — enhanced log detail for connection lifecycle
+
 ### v0.1.2
 
 - 🟢 **P2P green tag** — peers are now visually distinguished by connection type

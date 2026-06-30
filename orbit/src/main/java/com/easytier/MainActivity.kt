@@ -33,9 +33,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.lifecycleScope
 import com.easytier.ui.theme.currentColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.easytier.AppLogger
@@ -68,7 +72,6 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_NOTIFICATION = 2001
 
         /** Sentinel value meaning "user hasn't filled this field yet" */
-        private const val TOML_FIELD_EMPTY = ""
     }
 
     // ── Core State ──
@@ -258,7 +261,7 @@ class MainActivity : ComponentActivity() {
                         delay(100)
                         scrollState.scrollTo(scrollState.maxValue)
                         // Auto-refresh loop
-                        while (true) {
+                        while (isActive) {
                             delay(2000)
                             val newLog = AppLogger.getLatestLines(120)
                             if (newLog != logContent) {
@@ -663,198 +666,6 @@ class MainActivity : ComponentActivity() {
     }
 
     // ═══════════════════════════════════════════════
-    //  Config State Helpers (Compose ↔ JSON)
-    // ═══════════════════════════════════════════════
-
-    private fun captureFields(): JSONObject = JSONObject().also { j ->
-        val c = configState
-        j.put("networkName", c.networkName)
-        j.put("secret", c.secret)
-        j.put("server", c.server)
-        j.put("port", c.port)
-        j.put("ip", c.ipAddress)
-        j.put("prefix", c.ipPrefix)
-        j.put("instanceName", c.instanceName)
-        j.put("hostname", c.hostname)
-        j.put("dhcp", c.dhcp)
-        j.put("disableIpv6", c.disableIpv6)
-        j.put("noTun", c.noTun)
-        j.put("bindDevice", c.bindDevice)
-        j.put("disableP2p", c.disableP2p)
-        j.put("p2pOnly", c.p2pOnly)
-        j.put("lazyP2p", c.lazyP2p)
-        j.put("needP2p", c.needP2p)
-        j.put("disableTcpHp", c.disableTcpHp)
-        j.put("disableUdpHp", c.disableUdpHp)
-        j.put("disableSymHp", c.disableSymHp)
-        j.put("enableKcpProxy", c.enableKcpProxy)
-        j.put("disableKcpInput", c.disableKcpInput)
-        j.put("enableQuicProxy", c.enableQuicProxy)
-        j.put("disableQuicInput", c.disableQuicInput)
-        j.put("proxyForwardBySystem", c.proxyForwardBySystem)
-        j.put("relayAllRpc", c.relayAllRpc)
-        j.put("exitNode", c.exitNode)
-        j.put("latencyFirst", c.latencyFirst)
-        j.put("multiThread", c.multiThread)
-        j.put("useSmoltcp", c.useSmoltcp)
-        j.put("mtu", c.mtu)
-        j.put("disableEncrypt", c.disableEncrypt)
-        j.put("privateMode", c.privateMode)
-        j.put("acceptDns", c.acceptDns)
-        j.put("socks5", c.socks5)
-        j.put("portForward", c.portForward)
-        j.put("encryptAlgo", c.encryptAlgo)
-        j.put("compression", c.compression)
-        j.put("proxyNetworks", c.proxyNetworks)
-        j.put("exitNodes", c.exitNodes)
-    }
-
-    private fun applyFields(j: JSONObject) {
-        configState = ConfigState(
-            networkName = j.optString("networkName"),
-            secret = j.optString("secret"),
-            server = j.optString("server"),
-            port = j.optString("port"),
-            ipAddress = j.optString("ip"),
-            ipPrefix = j.optString("prefix").ifEmpty { "24" },
-            instanceName = j.optString("instanceName"),
-            hostname = j.optString("hostname"),
-            dhcp = j.optBoolean("dhcp"),
-            disableIpv6 = j.optBoolean("disableIpv6"),
-            noTun = j.optBoolean("noTun"),
-            bindDevice = j.optString("bindDevice"),
-            disableP2p = j.optBoolean("disableP2p"),
-            p2pOnly = j.optBoolean("p2pOnly"),
-            lazyP2p = j.optBoolean("lazyP2p"),
-            needP2p = j.optBoolean("needP2p"),
-            disableTcpHp = j.optBoolean("disableTcpHp"),
-            disableUdpHp = j.optBoolean("disableUdpHp"),
-            disableSymHp = j.optBoolean("disableSymHp"),
-            enableKcpProxy = j.optBoolean("enableKcpProxy"),
-            disableKcpInput = j.optBoolean("disableKcpInput"),
-            enableQuicProxy = j.optBoolean("enableQuicProxy"),
-            disableQuicInput = j.optBoolean("disableQuicInput"),
-            proxyForwardBySystem = j.optBoolean("proxyForwardBySystem"),
-            relayAllRpc = j.optBoolean("relayAllRpc"),
-            exitNode = j.optBoolean("exitNode"),
-            latencyFirst = j.optBoolean("latencyFirst"),
-            multiThread = j.optBoolean("multiThread"),
-            useSmoltcp = j.optBoolean("useSmoltcp"),
-            mtu = j.optString("mtu"),
-            disableEncrypt = j.optBoolean("disableEncrypt"),
-            privateMode = j.optBoolean("privateMode"),
-            acceptDns = j.optBoolean("acceptDns"),
-            socks5 = j.optString("socks5"),
-            portForward = j.optString("portForward"),
-            encryptAlgo = j.optString("encryptAlgo"),
-            compression = j.optString("compression"),
-            proxyNetworks = j.optString("proxyNetworks"),
-            exitNodes = j.optString("exitNodes")
-        )
-    }
-
-    // ═══════════════════════════════════════════════
-    //  TOML Builder (reads from configState)
-    // ═══════════════════════════════════════════════
-
-    private fun buildTomlConfig(): String {
-        val c = configState
-        val sb = StringBuilder()
-
-        val networkName = c.networkName.ifEmpty { TOML_FIELD_EMPTY }
-        val networkSecret = c.secret.ifEmpty { TOML_FIELD_EMPTY }
-        val server = c.server.ifEmpty { TOML_FIELD_EMPTY }
-        val port = c.port.ifEmpty { TOML_FIELD_EMPTY }
-        val ipAddr = c.ipAddress.ifEmpty { TOML_FIELD_EMPTY }
-        val ipPrefix = c.ipPrefix.ifEmpty { "24" }
-        val peerUri = if (server != TOML_FIELD_EMPTY && port != TOML_FIELD_EMPTY) "tcp://$server:$port"
-                       else "tcp://$TOML_FIELD_EMPTY"
-
-        val instanceName = c.instanceName.ifEmpty { "default" }
-        val hostname = c.hostname.ifEmpty { TOML_FIELD_EMPTY }
-
-        sb.append("instance_name = \"$instanceName\"\n")
-        if (hostname.isNotEmpty()) sb.append("hostname = \"$hostname\"\n")
-        sb.append("ipv4 = \"$ipAddr/$ipPrefix\"\n")
-        sb.append("dhcp = ${c.dhcp}\n\n")
-
-        sb.append("[network_identity]\n")
-        sb.append("network_name = \"$networkName\"\n")
-        sb.append("network_secret = \"$networkSecret\"\n\n")
-
-        sb.append("[[peer]]\n")
-        sb.append("uri = \"$peerUri\"\n\n")
-
-        if (c.disableIpv6) sb.append("disable_ipv6 = true\n")
-        if (c.noTun) sb.append("no_tun = true\n")
-        if (c.bindDevice.isNotEmpty()) sb.append("bind_device = \"${c.bindDevice}\"\n")
-
-        if (c.disableP2p) sb.append("disable_p2p = true\n")
-        if (c.p2pOnly) sb.append("p2p_only = true\n")
-        if (c.lazyP2p) sb.append("lazy_p2p = true\n")
-        if (c.needP2p) sb.append("need_p2p = true\n")
-
-        if (c.disableTcpHp) sb.append("disable_tcp_hole_punching = true\n")
-        if (c.disableUdpHp) sb.append("disable_udp_hole_punching = true\n")
-        if (c.disableSymHp) sb.append("disable_sym_hole_punching = true\n")
-
-        if (c.enableKcpProxy) sb.append("enable_kcp_proxy = true\n")
-        if (c.disableKcpInput) sb.append("disable_kcp_input = true\n")
-        if (c.enableQuicProxy) sb.append("enable_quic_proxy = true\n")
-        if (c.disableQuicInput) sb.append("disable_quic_input = true\n")
-        if (c.proxyForwardBySystem) sb.append("proxy_forward_by_system = true\n")
-        if (c.relayAllRpc) sb.append("relay_all_peer_rpc = true\n")
-        if (c.exitNode) sb.append("enable_exit_node = true\n")
-
-        if (c.latencyFirst) sb.append("latency_first = true\n")
-        if (c.multiThread) sb.append("multi_thread = true\n")
-        if (c.useSmoltcp) sb.append("use_smoltcp = true\n")
-        if (c.mtu.isNotEmpty()) sb.append("mtu = ${c.mtu}\n")
-
-        if (c.disableEncrypt) sb.append("disable_encryption = true\n")
-        if (c.privateMode) sb.append("private_mode = true\n")
-        if (c.acceptDns) sb.append("accept_dns = true\n")
-
-        if (c.socks5.isNotEmpty()) sb.append("socks5 = \"${c.socks5}\"\n")
-
-        if (c.portForward.isNotEmpty()) {
-            val parts = c.portForward.split("://")
-            if (parts.size == 2) {
-                val slashIdx = parts[1].lastIndexOf('/')
-                if (slashIdx > 0) {
-                    val localPart = parts[1].substring(0, slashIdx)
-                    val remotePart = parts[1].substring(slashIdx + 1)
-                    sb.append("[[port_forward]]\n")
-                    sb.append("port_forward_protocol = \"${parts[0]}\"\n")
-                    sb.append("port_forward_local = \"$localPart\"\n")
-                    sb.append("port_forward_remote = \"$remotePart\"\n")
-                }
-            }
-        }
-
-        if (c.encryptAlgo.isNotEmpty()) sb.append("encryption_algorithm = \"${c.encryptAlgo}\"\n")
-        if (c.compression.isNotEmpty() && c.compression != "none")
-            sb.append("compression = \"${c.compression}\"\n")
-
-        if (c.proxyNetworks.isNotEmpty()) {
-            c.proxyNetworks.split(",").forEach { cidr ->
-                val cidrTrim = cidr.trim()
-                if (cidrTrim.isNotEmpty())
-                    sb.append("[[proxy_networks]]\nproxy_network_cidr = \"$cidrTrim\"\n")
-            }
-        }
-
-        if (c.exitNodes.isNotEmpty()) {
-            c.exitNodes.split(",").forEach { vip ->
-                val v = vip.trim()
-                if (v.isNotEmpty()) sb.append("[[exit_nodes]]\nnode = \"$v\"\n")
-            }
-        }
-
-        return sb.toString()
-    }
-
-    // ═══════════════════════════════════════════════
     //  Config Management (file-based)
     // ═══════════════════════════════════════════════
 
@@ -936,7 +747,7 @@ class MainActivity : ComponentActivity() {
 
     private fun saveConfig(name: String) {
         val file = File(getConfigsDir(), "${sanitizeName(name)}.json")
-        val json = captureFields().toString()
+        val json = TomlUtils.configStateToJson(configState).toString()
         file.writeText(json)
         // Also save to external storage (survives uninstall)
         try {
@@ -968,7 +779,7 @@ class MainActivity : ComponentActivity() {
         }
         if (file.exists()) {
             try {
-                applyFields(JSONObject(file.readText()))
+                configState = TomlUtils.jsonToConfigState(JSONObject(file.readText()))
                 currentConfigName = name
                 // Persist last config name so it survives app restart
                 getSharedPreferences(PREFS_STATE, MODE_PRIVATE).edit()
@@ -1088,7 +899,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun exportConfigAsToml() {
-        val toml = buildTomlConfig()
+        val toml = TomlUtils.buildToml(configState)
         Intent(Intent.ACTION_SEND).also { intent ->
             intent.type = "text/plain"
             intent.putExtra(Intent.EXTRA_TEXT, toml)
@@ -1139,7 +950,7 @@ class MainActivity : ComponentActivity() {
                 EasyTierManager.getInstance().stop()
             }
 
-            val config = buildTomlConfig()
+            val config = TomlUtils.buildToml(configState)
             val noTun = configState.noTun
 
             val mgr = EasyTierManager.getInstance()
@@ -1237,31 +1048,30 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private var pollingJob: kotlinx.coroutines.Job? = null
+
     private fun startPolling() {
-        mainHandler.removeCallbacks(peerPollRunnable)
-        mainHandler.post(peerPollRunnable)
+        pollingJob?.cancel()
+        pollingJob = lifecycleScope.launch(Dispatchers.Main) {
+            while (isActive && this@MainActivity.isRunning) {
+                refreshPeerInfo()
+                delay(500L)
+            }
+        }
     }
 
     private fun stopPolling() {
-        mainHandler.removeCallbacks(peerPollRunnable)
-    }
-
-    private val peerPollRunnable = object : Runnable {
-        override fun run() {
-            if (isRunning) {
-                refreshPeerInfo()
-                mainHandler.postDelayed(this, 1000L)
-            }
-        }
+        pollingJob?.cancel()
+        pollingJob = null
     }
 
     // ═══════════════════════════════════════════════
     //  Peer Info → Compose State
     // ═══════════════════════════════════════════════
 
-    private fun refreshPeerInfo() {
+    private suspend fun refreshPeerInfo() {
         try {
-            val infosJson = EasyTierJNI.collectNetworkInfos(30)
+            val infosJson = withContext(Dispatchers.IO) { EasyTierJNI.collectNetworkInfos(30) }
             if (infosJson.isNullOrEmpty()) { myNodeItem = null; peerItems = emptyList(); return }
 
             val map = JSONObject(infosJson as String).optJSONObject("map") ?: run {
@@ -1465,6 +1275,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // Clean up stale peer stats for disconnected peers
+            val currentPeerIds = newPeers.map { it.peerId }.toSet()
+            prevPeerStats.keys.removeAll { it !in currentPeerIds }
+
             peerStatsTime = now
             peerItems = newPeers
 
@@ -1556,7 +1370,7 @@ class MainActivity : ComponentActivity() {
                 return
             }
             val text = inputStream.bufferedReader().use { it.readText() }
-            parseAndApplyToml(text)
+            configState = TomlUtils.jsonToConfigState(TomlUtils.parseTomlToJson(text))
             val autoName = fileName.removeSuffix(".toml").removeSuffix(".TOML")
                 .replace(Regex("[/\\\\:*?\"<>|]"), "_").take(64)
             saveConfig(autoName)
@@ -1570,112 +1384,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun parseAndApplyToml(text: String) {
-        val j = JSONObject()
-        var currentSection = ""
-
-        for (line in text.lines()) {
-            val trimmed = line.trim()
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
-
-            if (trimmed.startsWith("[")) {
-                currentSection = trimmed.removeSurrounding("[", "]")
-                continue
-            }
-
-            val eqIdx = trimmed.indexOf('=')
-            if (eqIdx < 0) continue
-            val key = trimmed.substring(0, eqIdx).trim()
-            val rawValue = trimmed.substring(eqIdx + 1).trim()
-            val value = rawValue.removeSurrounding("\"").trim()
-
-            when (key) {
-                "instance_name" -> j.put("instanceName", value)
-                "hostname" -> j.put("hostname", value)
-                "ipv4" -> {
-                    val slashIdx = value.indexOf('/')
-                    if (slashIdx > 0) {
-                        j.put("ip", value.substring(0, slashIdx))
-                        j.put("prefix", value.substring(slashIdx + 1))
-                    } else { j.put("ip", value) }
-                }
-                "dhcp" -> j.put("dhcp", parseBool(rawValue))
-                "network_name" -> j.put("networkName", value)
-                "network_secret" -> j.put("secret", value)
-                "uri" -> {
-                    val parts = value.split("://")
-                    if (parts.size == 2) {
-                        val hostPort = parts[1].split(":")
-                        if (hostPort.size == 2) {
-                            j.put("server", hostPort[0])
-                            j.put("port", hostPort[1])
-                        } else { j.put("server", parts[1]) }
-                    }
-                }
-                "disable_ipv6" -> j.put("disableIpv6", parseBool(rawValue))
-                "no_tun" -> j.put("noTun", parseBool(rawValue))
-                "bind_device" -> j.put("bindDevice", value)
-                "disable_p2p" -> j.put("disableP2p", parseBool(rawValue))
-                "p2p_only" -> j.put("p2pOnly", parseBool(rawValue))
-                "lazy_p2p" -> j.put("lazyP2p", parseBool(rawValue))
-                "need_p2p" -> j.put("needP2p", parseBool(rawValue))
-                "disable_tcp_hole_punching" -> j.put("disableTcpHp", parseBool(rawValue))
-                "disable_udp_hole_punching" -> j.put("disableUdpHp", parseBool(rawValue))
-                "disable_sym_hole_punching" -> j.put("disableSymHp", parseBool(rawValue))
-                "enable_kcp_proxy" -> j.put("enableKcpProxy", parseBool(rawValue))
-                "disable_kcp_input" -> j.put("disableKcpInput", parseBool(rawValue))
-                "enable_quic_proxy" -> j.put("enableQuicProxy", parseBool(rawValue))
-                "disable_quic_input" -> j.put("disableQuicInput", parseBool(rawValue))
-                "proxy_forward_by_system" -> j.put("proxyForwardBySystem", parseBool(rawValue))
-                "relay_all_peer_rpc" -> j.put("relayAllRpc", parseBool(rawValue))
-                "enable_exit_node" -> j.put("exitNode", parseBool(rawValue))
-                "latency_first" -> j.put("latencyFirst", parseBool(rawValue))
-                "multi_thread" -> j.put("multiThread", parseBool(rawValue))
-                "use_smoltcp" -> j.put("useSmoltcp", parseBool(rawValue))
-                "mtu" -> j.put("mtu", value)
-                "disable_encryption" -> j.put("disableEncrypt", parseBool(rawValue))
-                "private_mode" -> j.put("privateMode", parseBool(rawValue))
-                "accept_dns" -> j.put("acceptDns", parseBool(rawValue))
-                "socks5" -> j.put("socks5", value)
-                "encryption_algorithm" -> j.put("encryptAlgo", value)
-                "compression" -> j.put("compression", value)
-                "proxy_network_cidr" -> {
-                    val existing = j.optString("proxyNetworks")
-                    if (existing.isEmpty()) j.put("proxyNetworks", value)
-                    else j.put("proxyNetworks", "$existing,$value")
-                }
-                "node" -> {
-                    val existing = j.optString("exitNodes")
-                    if (existing.isEmpty()) j.put("exitNodes", value)
-                    else j.put("exitNodes", "$existing,$value")
-                }
-                "port_forward_protocol" -> j.put("_pfProto", value)
-                "port_forward_local" -> j.put("_pfLocal", value)
-                "port_forward_remote" -> {
-                    val proto = j.optString("_pfProto", "udp")
-                    val local = j.optString("_pfLocal", "")
-                    j.put("portForward", "$proto://$local/$value")
-                    j.remove("_pfLocal")
-                    j.remove("_pfProto")
-                }
-            }
-        }
-        applyFields(j)
-    }
-
-    private fun parseBool(s: String): Boolean =
-        s.trim().lowercase() in listOf("true", "yes", "1")
-
-    // ═══════════════════════════════════════════════
-    //  Language / Localization
-    // ═══════════════════════════════════════════════
-
     private fun tr(zh: String, en: String): String = if (langZh) zh else en
 
     private fun toggleLanguage() {
         langZh = !langZh
         getSharedPreferences(PREFS_LANG, MODE_PRIVATE).edit().putBoolean("lang_zh", langZh).apply()
-        Toast.makeText(this, if (langZh) "已切换为中文" else "Switched to English",
+        Toast.makeText(this, if (langZh) "\u5df2\u5207\u6362\u4e3a\u4e2d\u6587" else "Switched to English",
             Toast.LENGTH_SHORT).show()
         AppLogger.i("MainActivity", "Language switched: ${if (langZh) "zh" else "en"}")
     }
@@ -1693,21 +1407,21 @@ class MainActivity : ComponentActivity() {
     private fun promptConfigServer() {
         val input = EditText(this)
         input.setSingleLine(true)
-        input.hint = if (langZh) "输入配置服务器 URL" else "Enter config server URL"
+        input.hint = if (langZh) "\u8f93\u5165\u914d\u7f6e\u670d\u52a1\u5668 URL" else "Enter config server URL"
 
         AlertDialog.Builder(this)
-            .setTitle(tr("连接配置服务器", "Config Server"))
+            .setTitle(tr("\u8fde\u63a5\u914d\u7f6e\u670d\u52a1\u5668", "Config Server"))
             .setView(input)
-            .setPositiveButton(tr("获取", "Fetch")) { _: DialogInterface, _: Int ->
+            .setPositiveButton(tr("\u83b7\u53d6", "Fetch")) { _: DialogInterface, _: Int ->
                 val url = input.text.toString().trim()
                 if (url.isNotEmpty()) fetchConfigFromServer(url)
             }
-            .setNegativeButton(tr("取消", "Cancel"), null)
+            .setNegativeButton(tr("\u53d6\u6d88", "Cancel"), null)
             .show()
     }
 
     private fun fetchConfigFromServer(url: String) {
-        Toast.makeText(this, tr("正在获取…", "Fetching…"), Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr("\u6b63\u5728\u83b7\u53d6\u2026", "Fetching\u2026"), Toast.LENGTH_SHORT).show()
         Thread {
             try {
                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
@@ -1717,14 +1431,14 @@ class MainActivity : ComponentActivity() {
                 connection.disconnect()
 
                 mainHandler.post {
-                    parseAndApplyToml(text)
+                    configState = TomlUtils.jsonToConfigState(TomlUtils.parseTomlToJson(text))
                     saveConfig(currentConfigName)
-                    Toast.makeText(this, tr("配置已加载", "Config loaded"), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, tr("\u914d\u7f6e\u5df2\u52a0\u8f7d", "Config loaded"), Toast.LENGTH_SHORT).show()
                     AppLogger.i("MainActivity", "Config loaded from server: $url")
                 }
             } catch (t: Throwable) {
                 mainHandler.post {
-                    Toast.makeText(this, tr("获取失败: ${t.message}", "Failed: ${t.message}"), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, tr("\u83b7\u53d6\u5931\u8d25: ${t.message}", "Failed: ${t.message}"), Toast.LENGTH_LONG).show()
                     AppLogger.e("MainActivity", "Config server fetch error", t)
                 }
             }
